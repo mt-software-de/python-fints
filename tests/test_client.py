@@ -1,6 +1,7 @@
 from fints.client import FinTS3PinTanClient, TransactionResponse, NeedTANResponse, ResponseStatus, NeedRetryResponse
 from fints.exceptions import FinTSClientPINError, FinTSClientTemporaryAuthError
 from decimal import Decimal
+import re
 import pytest
 
 
@@ -27,6 +28,37 @@ def test_get_information(fints_client):
         information = fints_client.get_information()
 
     assert information["bank"]["name"] == 'Test Bank'
+
+
+def test_max_command_versions(fints_server):
+    """The test bank announces HKKAZ 4 to 7, a limit selects a lower version"""
+    from fints.segments.statement import HKKAZ5, HKKAZ6, HKKAZ7
+
+    client = FinTS3PinTanClient(
+        '12345678',
+        'test1',
+        '1234',
+        fints_server,
+        product_id="TEST-123", product_version="1.2.3",
+        max_command_versions={'HKKAZ': 6},
+    )
+    sent = []
+    send = client.connection.send
+
+    def capture(message):
+        sent.append(message.render_bytes())
+        return send(message)
+
+    client.connection.send = capture
+    with client:
+        assert client._find_highest_supported_command(HKKAZ5, HKKAZ6, HKKAZ7) is HKKAZ6
+        accounts = client.get_sepa_accounts()
+        client.get_transactions(accounts[0])
+        client.max_command_versions = {}
+        assert client._find_highest_supported_command(HKKAZ5, HKKAZ6, HKKAZ7) is HKKAZ7
+
+    assert any(b"HKKAZ:" in message for message in sent)
+    assert all(not re.search(rb"HKKAZ:\d+:7\+", message) for message in sent)
 
 
 def test_pin_wrong(fints_server):

@@ -168,7 +168,7 @@ class FinTS3Client:
                  bank_identifier, user_id, customer_id=None,
                  from_data: bytes=None, system_id=None,
                  product_id=None, product_version=version[:5],
-                 mode=FinTSClientMode.INTERACTIVE):
+                 mode=FinTSClientMode.INTERACTIVE, max_command_versions=None):
         self.accounts = []
         if isinstance(bank_identifier, BankIdentifier):
             self.bank_identifier = bank_identifier
@@ -195,6 +195,9 @@ class FinTS3Client:
         self.mode = mode
         self.init_tan_response = None
         self._standing_dialog = None
+        # Highest version to use per command, e.g. {'HKKAZ': 6}, for banks
+        # which announce a version in the BPD but reject it
+        self.max_command_versions = dict(max_command_versions or {})
 
         if from_data:
             self.set_data(bytes(from_data))
@@ -506,6 +509,9 @@ class FinTS3Client:
         return_parameter_segment = kwargs.get("return_parameter_segment", False)
 
         parameter_segment_name = "{}I{}S".format(segment_classes[0].TYPE[0], segment_classes[0].TYPE[2:])
+        max_command_version = self.max_command_versions.get(segment_classes[0].TYPE)
+        if max_command_version is not None:
+            segment_classes = [clazz for clazz in segment_classes if clazz.VERSION <= max_command_version]
         version_map = dict((clazz.VERSION, clazz) for clazz in segment_classes)
         max_version = self.bpd.find_segment_highest_version(parameter_segment_name, version_map.keys())
         if not max_version:
