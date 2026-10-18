@@ -1,6 +1,7 @@
 from fints.client import FinTS3PinTanClient, TransactionResponse, NeedTANResponse, ResponseStatus, NeedRetryResponse
 from fints.exceptions import FinTSClientPINError, FinTSClientTemporaryAuthError
 from decimal import Decimal
+import re
 import pytest
 
 
@@ -27,6 +28,32 @@ def test_get_information(fints_client):
         information = fints_client.get_information()
 
     assert information["bank"]["name"] == 'Test Bank'
+
+
+def test_security_profile(fints_client):
+    """The security profile of the signature matches the TAN method, like the
+    one of the encryption: PIN:1 for the one step method, PIN:2 otherwise"""
+    sent = []
+    send = fints_client.connection.send
+
+    def capture(message):
+        sent.append(message.render_bytes())
+        return send(message)
+
+    fints_client.connection.send = capture
+    with fints_client:
+        fints_client.get_sepa_accounts()
+
+    signatures = [
+        re.search(rb"HNSHK:\d+:4\+PIN:(\d)\+(\d+)\+", message).groups()
+        for message in sent
+    ]
+    assert (b'1', b'999') in signatures
+    assert (b'2', b'942') in signatures
+    assert all(
+        version == (b'1' if function == b'999' else b'2')
+        for version, function in signatures
+    )
 
 
 def test_pin_wrong(fints_server):

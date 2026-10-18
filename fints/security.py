@@ -95,6 +95,10 @@ class PinTanDummyEncryptionMechanism(EncryptionMechanism):
 
 
 class PinTanAuthenticationMechanism(AuthenticationMechanism):
+    # Version of the security method in the security profile: 1 for the one
+    # step method (999), 2 for the two step methods
+    security_method_version = 1
+
     def __init__(self, pin):
         self.pin = pin
         self.pending_signature = None
@@ -105,7 +109,7 @@ class PinTanAuthenticationMechanism(AuthenticationMechanism):
         rand = random.SystemRandom()
 
         self.pending_signature = HNSHK4(
-            security_profile=SecurityProfile(SecurityMethod.PIN, 1),
+            security_profile=SecurityProfile(SecurityMethod.PIN, self.security_method_version),
             security_function=self.security_function,
             security_reference=rand.randint(1000000, 9999999),
             security_application_area=SecurityApplicationArea.SHM,
@@ -174,6 +178,8 @@ class PinTanOneStepAuthenticationMechanism(PinTanAuthenticationMechanism):
 
 
 class PinTanTwoStepAuthenticationMechanism(PinTanAuthenticationMechanism):
+    security_method_version = 2
+
     def __init__(self, client, security_function, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.client = client
