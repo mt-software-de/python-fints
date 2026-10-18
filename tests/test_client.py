@@ -29,6 +29,22 @@ def test_get_information(fints_client):
     assert information["bank"]["name"] == 'Test Bank'
 
 
+def test_init_tan_response_to_hkidn(fints_server):
+    """Some banks respond to HKIDN instead of HKTAN that the dialog
+    initialization needs a TAN"""
+    client = FinTS3PinTanClient(
+        '12345678',
+        'test-hkidn',
+        '1234',
+        fints_server,
+        product_id="TEST-123", product_version="1.2.3",
+    )
+    with client:
+        assert isinstance(client.init_tan_response, NeedTANResponse)
+        assert not client.init_tan_response.decoupled
+        assert client.init_tan_response.challenge == 'Geben Sie die TAN an'
+
+
 def test_pin_wrong(fints_server):
     client = FinTS3PinTanClient(
         '12345678',

@@ -85,18 +85,25 @@ class FinTSDialog:
                 retval = self.send(*segments, internal_send=True)
 
                 if tan_seg:
-                    for resp in retval.responses(tan_seg):
-                        if resp.code in ('0030', '3955'):
-                            self.client.init_tan_response = NeedTANResponse(
-                                None,
-                                retval.find_segment_first('HITAN'),
-                                '_continue_dialog_initialization',
-                                self.client.is_challenge_structured(),
-                                False,
-                            )
-                            if resp.code == '3955':
-                                self.client.init_tan_response.decoupled = True
-                                break
+                    # Some banks respond to HKIDN instead of HKTAN that a TAN
+                    # is required
+                    tan_required = False
+                    for seg in (tan_seg, segments[0]):
+                        for resp in retval.responses(seg):
+                            if resp.code in ('0030', '3955'):
+                                tan_required = True
+                                self.client.init_tan_response = NeedTANResponse(
+                                    None,
+                                    retval.find_segment_first('HITAN'),
+                                    '_continue_dialog_initialization',
+                                    self.client.is_challenge_structured(),
+                                    False,
+                                )
+                                if resp.code == '3955':
+                                    self.client.init_tan_response.decoupled = True
+                                    break
+                        if tan_required:
+                            break
 
                 self.need_init = False
                 return retval

@@ -52,6 +52,14 @@ def fints_server():
 
             result.append(b"HIRMG::2+0010::Nachricht entgegengenommen'")
 
+            # Some banks respond to HKIDN instead of HKTAN that the dialog
+            # initialization needs a TAN
+            hkidn = re.search(rb"'HKIDN:(\d+):2\+280:12345678\+test-hkidn\+", message)
+            hktan_init = re.search(rb"'HKTAN:(\d+):(\d+)\+4\+", message)
+            if hkidn and hktan_init:
+                result.append("HIRMS::2:{}+0030::Auftragsfreigabe erforderlich'".format(hkidn.group(1).decode('us-ascii')).encode('us-ascii'))
+                result.append("HITAN::{}:{}+4++{}+Geben Sie die TAN an'".format(hktan_init.group(2).decode('us-ascii'), hktan_init.group(1).decode('us-ascii'), uuid.uuid4().hex).encode('us-ascii'))
+
             hkvvb = re.search(rb"'HKVVB:(\d+):3\+(\d+)\+(\d+)", message)
             if hkvvb:
                 responses = [hkvvb.group(1)]
